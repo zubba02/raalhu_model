@@ -1,0 +1,53 @@
+$*************HEADING****************************************
+$
+PROJ 'a11refr' 'A11'
+$
+$ PURPOSE OF TEST: Test of the refraction formulation
+$
+$ --|--------------------------------------------------------------|--
+$   | This SWAN input file is part of the bench mark tests for     |
+$   | SWAN.                                                        |
+$ --|--------------------------------------------------------------|--
+$
+$***********MODEL INPUT**************************************
+$
+$CGRID 295668.0 191709.0 0. 55000.00 52000.00 100 100 CIRCLE 36 0.0521 1. 31
+
+CGRID UNSTRUCTURED CIRCLE 36 0.0521 1. 31
+READ UNSTRUCTURED triangle 'TEST.4'
+
+$
+$INPgrid BOTtom REGular 295668.0 191709.0 0. 249 249 220. 208. EXCeption 999999.00
+$READinp BOTtom -1. 'clippedbathy_250_250.csv' 4 FREE
+
+INPgrid BOTtom REGular 295668.0 191709.0 0. 999 999 55. 55. EXCeption 999999.00
+READinp BOTtom -1. 'clippedbathy_1000_1000.csv' 4 FREE
+
+
+$
+BOUN SHAPE JON 3.3 PEAK DSPR DEGREES 
+$BOUN SIDE N CONST PAR 2.2 12 110 30 
+BOUN SIDE 102 CONST PAR 2.2 12 110 30 
+$BOUN SIDE W CONST PAR 0.3 20 45 30 
+$BOUN SIDE S CONST PAR 2.2 12 110 30
+$
+
+WIND 15 0 
+
+GEN3 JANSSEN 4.5 0.5 AGROW 0.003
+QUAD
+BREA
+WCAP
+$
+$************ OUTPUT REQUESTS *************************
+$
+$
+$*************************************************************
+BLOCK  'COMPGRID' NOHEAD 'Wind_w_ha3.vtu' LAYOUT 3 XP YP BOTLEV WATLEV DEPTH HS TM01 DSPR PDIR VEL FRCOEFF TPS URMS
+$
+$ set itest=1 in order to get detailed information in PRINT file
+TEST 1,0
+COMPUTE
+STOP
+
+
