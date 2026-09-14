@@ -6,14 +6,14 @@ import os
 import xarray as xr
 import glob
 import numpy as np
-import os
 import subprocess
+import pyvista as pv
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20250309/00/wave/gridded/gfswave.t00z.global.0p16.f000.grib2
 
 todaysdate = arrow.now().format('YYYYMMDD')
 
-#todaysdate = '20260622'
+#todaysdate = '20260902'
 
 def get_gfs_grib():
 
@@ -229,6 +229,8 @@ def write_run_file():
         f.write('\n')
         f.write('TEST 1,0')
         f.write('\n')
+        f.write('NUMERIC STOPC 0.05 0.05 0.95 1')
+        f.write('\n')
         f.write('COMPUTE')
         f.write('\n')
         f.write('STOP')
@@ -271,10 +273,38 @@ def run_files_powershell():
 
 
 
+def make_png():
+    vtu_files = glob.iglob('{}/*.vtu'.format(todaysdate))
+    for k in vtu_files :
+        mesh = pv.read("{}".format(k))
+        print("Point data:", mesh.point_data.keys())
+        print("Cell data:", mesh.cell_data.keys())
+
+        plotter = pv.Plotter(off_screen=True, window_size=(3000, 3000))
+
+        plotter.add_mesh(mesh,scalars="Hsig",clim=(0, 2),cmap="turbo",show_edges=False,
+        scalar_bar_args={
+            "title": "Hsig (m)",
+            "title_font_size": 50,
+            "label_font_size": 50,
+            "fmt": "%.1f",  # Number formatting
+            "position_x": 0.2,
+            "position_y": 0.01,
+            "vertical": False,
+        })
+        plotter.view_xy()
+        plotter.camera.Zoom(1.2)
+        plotter.show(screenshot="{}.png".format(k))
+
+
+
+
 
 #schedule.every(1).seconds.do(write_run_file)
 
 #schedule.every(1).seconds.do(run_files)
+
+
 
 #schedule.every(1).seconds.do(get_gfs_grib)
 
@@ -287,6 +317,8 @@ def run_files_powershell():
 #schedule.every(1).seconds.do(run_files)
 
 #schedule.every(1).seconds.do(run_files_powershell)
+
+schedule.every(1).seconds.do(make_png)
 
 
 
