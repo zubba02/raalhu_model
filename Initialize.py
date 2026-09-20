@@ -8,6 +8,10 @@ import glob
 import numpy as np
 import subprocess
 import pyvista as pv
+import meshio
+import matplotlib.pyplot as plt
+import matplotlib.tri as tri
+from matplotlib.colors import ListedColormap, BoundaryNorm
 
 #https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20250309/00/wave/gridded/gfswave.t00z.global.0p16.f000.grib2
 
@@ -21,7 +25,7 @@ def get_gfs_grib():
 
     output_directory = os.mkdir('{}'.format(todaysdate))
 
-    for i in range(1,24,1):
+    for i in range(1,2,1):
 
         print ('DOWNLOADING FORECAST : {:03d}z'.format(i))
 
@@ -140,7 +144,7 @@ def get_winds():
 
 def write_run_file():
 
-    all_times = ['f{:03}'.format(i) for i in range(1,24,1)]
+    all_times = ['f{:03}'.format(i) for i in range(1,2,1)]
 
     for j in all_times :
 
@@ -229,7 +233,7 @@ def write_run_file():
         f.write('\n')
         f.write('TEST 1,0')
         f.write('\n')
-        f.write('NUMERIC STOPC 0.05 0.05 0.95 1')
+        f.write('NUMERIC STOPC 0.1 0.1 0.95 1')
         f.write('\n')
         f.write('COMPUTE')
         f.write('\n')
@@ -240,7 +244,7 @@ def write_run_file():
 
 def run_files():
 
-    all_swan_files = ['f{:03}.swn'.format(i) for i in range(1,24,1)]
+    all_swan_files = ['f{:03}.swn'.format(i) for i in range(1,2,1)]
 
     with open('{}/run_all.sh'.format(todaysdate), 'w') as r:
 
@@ -257,7 +261,7 @@ def run_files():
 
 def run_files_powershell():
 
-    all_swan_files = ['f{:03}.swn'.format(i) for i in range(1,24,1)]
+    all_swan_files = ['f{:03}.swn'.format(i) for i in range(1,2,1)]
 
     with open('{}/run_all.ps1'.format(todaysdate), 'w') as r:
 
@@ -287,7 +291,7 @@ def make_png():
             "title": "Hsig (m)",
             "title_font_size": 50,
             "label_font_size": 50,
-            "fmt": "%.1f",  # Number formatting
+            "fmt": "%.1f",
             "position_x": 0.2,
             "position_y": 0.01,
             "vertical": False,
@@ -297,13 +301,142 @@ def make_png():
         plotter.show(screenshot="{}.png".format(k))
 
 
+def plot_wave_height_and_period(vtu_file):
+
+    mesh = meshio.read(vtu_file)
+
+    points = mesh.points
+    x = points[:, 0]
+    y = points[:, 1]
+
+    triangles = mesh.cells_dict["triangle"]
+
+    hs_meters = mesh.point_data["Hsig"]
+    hs_feet = hs_meters * 3.28084
+
+    wdir_deg = mesh.point_data["PkDir"]
+    tpsmoo = mesh.point_data["Tm01"]
+
+    depth = mesh.point_data["Depth"]
+
+    triang = tri.Triangulation(x, y, triangles)
+
+    colors_hs = [
+        "#000080", "#0033cc", "#0066ff", "#00ccff", "#00ffff",
+        "#00ff99", "#00ff00", "#66ff00", "#ccff00", "#ffff00",
+        "#ffcc00", "#ff9900", "#ff6600", "#ff0000", "#cc0000",
+    ]
+    cmap_hs = ListedColormap(colors_hs)
+    levels_hs = np.arange(0, 7.0, 0.5)
+    norm_hs = BoundaryNorm(levels_hs, cmap_hs.N)
+
+    base_cmap_tp = plt.colormaps['plasma']
+    levels_tp = np.arange(5, 10.0, 0.2)
+    cmap_tp = base_cmap_tp.resampled(len(levels_tp) - 1)
+    norm_tp = BoundaryNorm(levels_tp, cmap_tp.N)
+
+
+    bathy_levels = [5.0, 20.0]
+
+
+    fig, (ax1, ax2) = plt.subplots(
+        1, 2,
+        figsize=(22, 11),
+        facecolor="lightgray"
+    )
+
+
+    cf1 = ax1.tricontourf(
+        triang, hs_feet,
+        levels=levels_hs, cmap=cmap_hs, norm=norm_hs, extend="max"
+    )
+
+    ax1.tricontour(
+        triang, hs_feet,
+        levels=np.arange(0, 7.5, 1.0), colors="k", linewidths=0.3
+    )
+
+
+    contour_bathy1 = ax1.tricontour(
+        triang, depth,
+        levels=bathy_levels, colors="#555555", linestyles="dashed", linewidths=0.6
+    )
+    ax1.clabel(contour_bathy1, inline=True, fmt="%d m", fontsize=8, colors="#555555")
+
+    rad = np.deg2rad(wdir_deg)
+    u = np.cos(rad)
+    v = np.sin(rad)
+
+    stride = 100000
+    mask = hs_feet > 0.05
+
+    ax1.quiver(
+        x[mask][::stride], y[mask][::stride],
+        u[mask][::stride], v[mask][::stride],
+        color="white", edgecolor="black", linewidth=0.6,
+        scale=35, width=0.0035, headwidth=4, pivot="middle"
+    )
+
+    ax1.set_aspect("equal")
+    ax1.set_title("Significant Wave Height (ft)", fontsize=14, fontweight="bold")
+
+    cbar1 = fig.colorbar(cf1, ax=ax1, orientation="horizontal", pad=0.06, fraction=0.045)
+    cbar1.set_label("Wave Height (ft)", fontsize=11)
+
+    cf2 = ax2.tricontourf(
+        triang, tpsmoo,
+        levels=levels_tp, cmap=cmap_tp, norm=norm_tp, extend="both"
+    )
+
+    ax2.tricontour(
+        triang, tpsmoo,
+        levels=np.arange(5, 11.1, 1.0), colors="k", linewidths=0.4, alpha=0.7
+    )
+
+    contour_bathy2 = ax2.tricontour(
+        triang, depth,
+        levels=bathy_levels, colors="#444444", linestyles="dashed", linewidths=0.6
+    )
+    ax2.clabel(contour_bathy2, inline=True, fmt="%d m", fontsize=8, colors="#444444")
+
+    ax2.set_aspect("equal")
+    ax2.set_title("Mean Wave Period (s)", fontsize=14, fontweight="bold")
+
+    cbar2 = fig.colorbar(
+        cf2, ax=ax2, orientation="horizontal", pad=0.06, fraction=0.045,
+        ticks=np.arange(5, 11.1, 1.0), format="%.1f"
+    )
+    cbar2.set_label("Wave Period (seconds)", fontsize=11)
+
+    for ax in [ax1, ax2]:
+        ax.tick_params(axis='both', which='major', labelsize=9, colors='#333333')
+        ax.get_xaxis().get_major_formatter().set_scientific(False)
+        ax.get_yaxis().get_major_formatter().set_scientific(False)
+        ax.grid(True, linestyle="--", alpha=0.5, color="gray", linewidth=0.5)
+
+    fig.suptitle(
+        f"Maldives Experimental Wave Forecast System (MEWFS) Output\n{os.path.basename(vtu_file)}",
+        fontsize=18, fontweight="bold", y=0.96
+    )
+
+    plt.tight_layout(rect=[0, 0, 1, 0.93])
+
+    png_name = os.path.splitext(vtu_file)[0] + "_combined.png"
+    plt.savefig(png_name, dpi=300, bbox_inches="tight", facecolor="lightgray")
+    plt.close()
+
+    print("Saved combined plot with bathymetry:", png_name)
+
+
+def make_height_and_period():
+    for vtu in glob.glob(f"{todaysdate}/*.vtu"):
+        plot_wave_height_and_period(vtu)
 
 
 
 #schedule.every(1).seconds.do(write_run_file)
 
 #schedule.every(1).seconds.do(run_files)
-
 
 
 #schedule.every(1).seconds.do(get_gfs_grib)
@@ -318,8 +451,9 @@ def make_png():
 
 #schedule.every(1).seconds.do(run_files_powershell)
 
-schedule.every(1).seconds.do(make_png)
+#schedule.every(1).seconds.do(make_png)
 
+schedule.every(1).seconds.do(make_height_and_period)
 
 
 
