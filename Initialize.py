@@ -1,4 +1,5 @@
 import wget
+import shutil
 import arrow
 import schedule
 import time
@@ -25,7 +26,7 @@ def get_gfs_grib():
 
     output_directory = os.mkdir('{}'.format(todaysdate))
 
-    for i in range(1,2,1):
+    for i in range(1,23,1):
 
         print ('DOWNLOADING FORECAST : {:03d}z'.format(i))
 
@@ -144,7 +145,7 @@ def get_winds():
 
 def write_run_file():
 
-    all_times = ['f{:03}'.format(i) for i in range(1,2,1)]
+    all_times = ['f{:03}'.format(i) for i in range(1,23,1)]
 
     for j in all_times :
 
@@ -160,7 +161,7 @@ def write_run_file():
 
 
 
-        print (j)
+        print ("Writting run files for forecase hour {}".format(j))
 
         f = open("{}/{}.swn".format(todaysdate,j), "w")
 
@@ -233,7 +234,7 @@ def write_run_file():
         f.write('\n')
         f.write('TEST 1,0')
         f.write('\n')
-        f.write('NUMERIC STOPC 0.1 0.1 0.95 1')
+        f.write('NUMERIC STOPC 0.5 0.5 0.95 1')
         f.write('\n')
         f.write('COMPUTE')
         f.write('\n')
@@ -244,7 +245,9 @@ def write_run_file():
 
 def run_files():
 
-    all_swan_files = ['f{:03}.swn'.format(i) for i in range(1,2,1)]
+    original_dir = os.getcwd()
+
+    all_swan_files = ['f{:03}.swn'.format(i) for i in range(1,23,1)]
 
     with open('{}/run_all.sh'.format(todaysdate), 'w') as r:
 
@@ -258,8 +261,12 @@ def run_files():
 
     subprocess.call('./run_all.sh', shell=True)
 
+    os.chdir(original_dir)
+
 
 def run_files_powershell():
+
+    original_dir = os.getcwd()
 
     all_swan_files = ['f{:03}.swn'.format(i) for i in range(1,2,1)]
 
@@ -274,6 +281,8 @@ def run_files_powershell():
     os.chdir('{}'.format(todaysdate))
 
     subprocess.run(["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", "run_all.ps1"])
+
+    os.chdir(original_dir)
 
 
 
@@ -434,6 +443,51 @@ def make_height_and_period():
 
 
 
+
+def copy_pngs_to_web_folder():
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    date_folder = arrow.now().format("YYYYMMDD")
+
+    destination = os.path.join(
+        script_dir,
+        "raalhu_web",
+        "images",
+        "Laamu",
+        date_folder
+    )
+
+    os.makedirs(destination, exist_ok=True)
+
+    png_files = glob.glob(f"{todaysdate}/*.png")
+
+    print(f"Found {len(png_files)} PNG files")
+
+    for png in png_files:
+
+        shutil.copy2(png, destination)
+
+        print(f"Copied {os.path.basename(png)}")
+
+    print(f"Files copied to {destination}")
+
+
+def run_git_upload():
+
+    original_dir = os.getcwd()
+
+    os.chdir(f"raalhu_web")
+
+    subprocess.run(["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", "git_upload.ps1"])
+
+    os.chdir(original_dir)
+
+
+
+
+
+
 #schedule.every(1).seconds.do(write_run_file)
 
 #schedule.every(1).seconds.do(run_files)
@@ -453,7 +507,12 @@ def make_height_and_period():
 
 #schedule.every(1).seconds.do(make_png)
 
-schedule.every(1).seconds.do(make_height_and_period)
+#schedule.every(1).seconds.do(make_height_and_period)
+
+schedule.every(1).seconds.do(copy_pngs_to_web_folder)
+
+schedule.every(1).seconds.do(run_git_upload)
+
 
 
 
