@@ -473,7 +473,7 @@ def copy_pngs_to_web_folder():
     print(f"Files copied to {destination}")
 
 
-def run_git_upload():
+def run_git_upload_ps():
 
     original_dir = os.getcwd()
 
@@ -484,7 +484,15 @@ def run_git_upload():
     os.chdir(original_dir)
 
 
+def run_git_upload():
 
+    original_dir = os.getcwd()
+
+    os.chdir(f"raalhu_web")
+
+    subprocess.call('./git_upload.sh', shell=True)
+
+    os.chdir(original_dir)
 
 
 
@@ -511,7 +519,7 @@ def run_git_upload():
 
 schedule.every(1).seconds.do(copy_pngs_to_web_folder)
 
-schedule.every(1).seconds.do(run_git_upload)
+schedule.every(1).seconds.do(run_git_upload_ps)
 
 
 
